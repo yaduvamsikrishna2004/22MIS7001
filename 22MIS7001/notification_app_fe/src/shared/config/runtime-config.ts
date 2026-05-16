@@ -54,9 +54,7 @@ const normalizeApiBaseUrl = (
   }
 };
 
-const parsedApiBaseUrl = normalizeApiBaseUrl(
-  import.meta.env.VITE_NOTIFICATION_API_URL || import.meta.env.VITE_API_BASE_URL
-);
+const parsedApiBaseUrl = normalizeApiBaseUrl(import.meta.env.VITE_NOTIFICATION_API_URL);
 
 const bearerToken = (import.meta.env.VITE_API_BEARER_TOKEN || '').trim();
 

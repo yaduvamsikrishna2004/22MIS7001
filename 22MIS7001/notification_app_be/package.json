@@ -8,7 +8,9 @@
     "dev": "tsx watch src/bootstrap/server.ts",
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "start": "node dist/bootstrap/server.js"
+    "start": "node dist/bootstrap/server.js",
+    "auth:token": "tsx src/bootstrap/generate-evaluation-token.ts",
+    "auth:token:write-fe": "tsx src/bootstrap/generate-evaluation-token.ts --write-frontend-env"
   },
   "dependencies": {
     "cors": "^2.8.5",

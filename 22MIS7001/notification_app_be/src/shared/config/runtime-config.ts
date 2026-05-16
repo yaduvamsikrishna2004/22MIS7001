@@ -10,6 +10,18 @@ export interface BackendRuntimeConfig {
   maxReconnectAttemptsPerWindow: number;
   slowQueryThresholdMs: number;
   deltaSyncHardLimit: number;
+  evaluationAuth: {
+    apiBaseUrl: string;
+    authPath: string;
+    timeoutMs: number;
+    accessCode?: string;
+    clientId?: string;
+    clientSecret?: string;
+    defaultEmail?: string;
+    defaultName?: string;
+    defaultRollNo?: string;
+    frontendNotificationApiUrl?: string;
+  };
 }
 
 const parsePort = (value: string | undefined): number => {
@@ -83,7 +95,19 @@ export const loadRuntimeConfig = (): BackendRuntimeConfig => {
       'BE_MAX_RECONNECT_ATTEMPTS'
     ),
     slowQueryThresholdMs: parsePositiveInteger(env.BE_SLOW_QUERY_THRESHOLD_MS, 400, 'BE_SLOW_QUERY_THRESHOLD_MS'),
-    deltaSyncHardLimit: parsePositiveInteger(env.BE_DELTA_SYNC_HARD_LIMIT, 200, 'BE_DELTA_SYNC_HARD_LIMIT')
+    deltaSyncHardLimit: parsePositiveInteger(env.BE_DELTA_SYNC_HARD_LIMIT, 200, 'BE_DELTA_SYNC_HARD_LIMIT'),
+    evaluationAuth: {
+      apiBaseUrl: (env.EVALUATION_API_BASE_URL || '').trim(),
+      authPath: (env.EVALUATION_AUTH_PATH || '/evaluation-service/auth').trim() || '/evaluation-service/auth',
+      timeoutMs: parsePositiveInteger(env.EVALUATION_AUTH_TIMEOUT_MS, 7000, 'EVALUATION_AUTH_TIMEOUT_MS'),
+      accessCode: env.ACCESS_CODE?.trim(),
+      clientId: env.CLIENT_ID?.trim(),
+      clientSecret: env.CLIENT_SECRET?.trim(),
+      defaultEmail: env.AUTH_BOOTSTRAP_EMAIL?.trim(),
+      defaultName: env.AUTH_BOOTSTRAP_NAME?.trim(),
+      defaultRollNo: env.AUTH_BOOTSTRAP_ROLL_NO?.trim(),
+      frontendNotificationApiUrl: env.FRONTEND_NOTIFICATION_API_URL?.trim()
+    }
   };
 };
 

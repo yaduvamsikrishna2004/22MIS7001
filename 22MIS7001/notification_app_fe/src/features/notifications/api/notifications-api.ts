@@ -1,6 +1,7 @@
 import { isAxiosError } from 'axios';
 
 import { executeRequest } from '@shared/api/request-client';
+import { runtimeConfig } from '@shared/config/runtime-config';
 import type { NotificationPageResult, NotificationRecord, NotificationType } from '@shared/contracts/notification-contracts';
 import { logFrontend } from '@shared/telemetry/frontend-log';
 
@@ -10,6 +11,22 @@ interface FetchNotificationsInput {
   limit: number;
   notificationType?: NotificationType;
 }
+
+const resolveNotificationsPath = (): string => {
+  try {
+    const parsedUrl = new URL(runtimeConfig.apiBaseUrl);
+    const normalizedPath = parsedUrl.pathname.replace(/\/+$/, '');
+    if (normalizedPath.endsWith('/evaluation-service')) {
+      return '/notifications';
+    }
+  } catch {
+    void logFrontend('warn', 'api', 'api base URL parse failed while resolving notification path', {
+      apiBaseUrl: runtimeConfig.apiBaseUrl
+    });
+  }
+
+  return '/evaluation-service/notifications';
+};
 
 const parsePriority = (value: unknown): NotificationRecord['priority'] => {
   if (value === 'low' || value === 'normal' || value === 'high' || value === 'critical') {
@@ -57,7 +74,16 @@ const parseItem = (candidate: unknown): NotificationRecord | null => {
 
 const normalizePageResponse = (rawData: unknown, page: number, limit: number): NotificationPageResult => {
   if (Array.isArray(rawData)) {
-    const items = rawData.map(parseItem).filter((entry): entry is NotificationRecord => entry !== null);
+    const parsedItems = rawData.map(parseItem);
+    const items = parsedItems.filter((entry): entry is NotificationRecord => entry !== null);
+    const malformedCount = parsedItems.length - items.length;
+    if (malformedCount > 0) {
+      void logFrontend('warn', 'api', 'malformed notification payload entries dropped', {
+        malformedCount,
+        sourceShape: 'array'
+      });
+    }
+
     return {
       items,
       page,
@@ -81,9 +107,15 @@ const normalizePageResponse = (rawData: unknown, page: number, limit: number): N
     (Array.isArray(asObject.notifications) ? asObject.notifications : null) ??
     [];
 
-  const items = candidateItems
-    .map(parseItem)
-    .filter((entry): entry is NotificationRecord => entry !== null);
+  const parsedItems = candidateItems.map(parseItem);
+  const items = parsedItems.filter((entry): entry is NotificationRecord => entry !== null);
+  const malformedCount = parsedItems.length - items.length;
+  if (malformedCount > 0) {
+    void logFrontend('warn', 'api', 'malformed notification payload entries dropped', {
+      malformedCount,
+      sourceShape: 'object'
+    });
+  }
 
   const totalPages =
     typeof asObject.totalPages === 'number' && Number.isFinite(asObject.totalPages)
@@ -117,10 +149,12 @@ export const fetchNotificationsPage = async ({
   limit,
   notificationType
 }: FetchNotificationsInput): Promise<NotificationPageResult> => {
+  const requestPath = resolveNotificationsPath();
+
   try {
     const rawData = await executeRequest<unknown>('api', {
       method: 'get',
-      url: '/evaluation-service/notifications',
+      url: requestPath,
       signal,
       params: {
         page,
@@ -138,7 +172,8 @@ export const fetchNotificationsPage = async ({
     await logFrontend('warn', 'api', 'notification fetch API failed', {
       page,
       limit,
-      notificationType: notificationType || 'all'
+      notificationType: notificationType || 'all',
+      requestPath
     });
     throw error;
   }
