@@ -10,10 +10,11 @@ declare module 'express-serve-static-core' {
 
 export const requestContextMiddleware = (
   req: Request,
-  _res: Response,
+  res: Response,
   next: NextFunction
 ): void => {
   req.requestId = req.header('x-request-id') || randomUUID();
   req.requestStartEpochMs = Date.now();
+  res.setHeader('x-request-id', req.requestId);
   next();
 };

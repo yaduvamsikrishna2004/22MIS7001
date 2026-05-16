@@ -1,11 +1,6 @@
 import { dispatchLog } from './log-dispatcher.js';
-import type {
-  LogContext,
-  LogLevel,
-  LogPackage,
-  LogStack,
-  LogPayload
-} from '../types/log-contract.js';
+import type { LogContext, LogLevel, LogPackage, LogPayload, LogStack } from '../types/log-contract.js';
+import { normalizeIsoTimestamp } from '../utils/timestamp.js';
 
 export const Log = async (
   stack: LogStack,
@@ -19,9 +14,13 @@ export const Log = async (
     level,
     package: pkg,
     message,
-    timestamp: new Date().toISOString(),
+    timestamp: normalizeIsoTimestamp(),
     context
   };
 
-  await dispatchLog(payload);
+  try {
+    await dispatchLog(payload);
+  } catch {
+    // logging path must never break application path
+  }
 };

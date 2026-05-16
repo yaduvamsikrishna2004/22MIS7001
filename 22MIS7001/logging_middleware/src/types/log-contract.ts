@@ -45,3 +45,16 @@ export interface LoggingRuntimeConfig {
   clientId?: string;
   clientSecret?: string;
 }
+
+export interface LogErrorMetadata {
+  errorCode: string;
+  statusCode?: number;
+  errorMessage: string;
+  retryable: boolean;
+  attempt: number;
+}
+
+export interface DispatchOutcome {
+  accepted: boolean;
+  failure?: LogErrorMetadata;
+}

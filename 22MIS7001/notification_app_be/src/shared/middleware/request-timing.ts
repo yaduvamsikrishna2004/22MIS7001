@@ -2,25 +2,26 @@ import type { NextFunction, Request, Response } from 'express';
 
 import { logBackend } from '../../integrations/logging/backend-log.js';
 
-export const httpAccessLogMiddleware = (
+export const requestTimingMiddleware = (
   req: Request,
   res: Response,
   next: NextFunction
 ): void => {
-  void logBackend('info', 'route', 'incoming request', {
+  void logBackend('info', 'route', 'request received', {
     method: req.method,
-    path: req.path,
+    path: req.originalUrl,
     requestId: req.requestId
   });
 
   res.on('finish', () => {
-    const durationMs = Date.now() - req.requestStartEpochMs;
+    const elapsedMs = Date.now() - req.requestStartEpochMs;
+    const level = res.statusCode >= 500 ? 'error' : res.statusCode >= 400 ? 'warn' : 'info';
 
-    void logBackend('info', 'middleware', 'request completed', {
+    void logBackend(level, 'middleware', 'request completed', {
       method: req.method,
-      path: req.path,
+      path: req.originalUrl,
       statusCode: res.statusCode,
-      durationMs,
+      elapsedMs,
       requestId: req.requestId
     });
   });

@@ -1,20 +1,16 @@
 import type { Request, Response } from 'express';
 
 import { logBackend } from '../../integrations/logging/backend-log.js';
+import { sendSuccess } from '../../shared/transport/http-response.js';
 import { buildHealthSnapshot } from './health-service.js';
 
 export const getHealthStatus = async (req: Request, res: Response): Promise<void> => {
-  const data = await buildHealthSnapshot();
+  const snapshot = await buildHealthSnapshot();
 
-  await logBackend('info', 'handler', 'health status requested', {
-    requestId: req.requestId
+  await logBackend('debug', 'service', 'health snapshot generated', {
+    requestId: req.requestId,
+    uptimeSeconds: snapshot.uptimeSeconds
   });
 
-  res.status(200).json({
-    data,
-    meta: {
-      requestId: req.requestId,
-      timestamp: new Date().toISOString()
-    }
-  });
+  sendSuccess(res, 200, req.requestId, snapshot);
 };

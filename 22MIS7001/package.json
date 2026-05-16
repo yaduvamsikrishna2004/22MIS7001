@@ -8,7 +8,8 @@
     "notification_app_fe"
   ],
   "scripts": {
-    "build": "npm run build -ws",
+    "build": "npm run build -w logging_middleware && npm run build -w notification_app_be && npm run build -w notification_app_fe",
+    "typecheck": "npm run build -w logging_middleware && npm run typecheck -w notification_app_be && npm run typecheck -w notification_app_fe",
     "dev:be": "npm run dev -w notification_app_be",
     "dev:fe": "npm run dev -w notification_app_fe"
   }

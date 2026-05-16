@@ -11,7 +11,7 @@ export const NotificationHome = () => {
         <Stack spacing={1.5}>
           <Typography variant="h6">Notification Feed Bootstrap</Typography>
           <Typography variant="body2" color="text.secondary">
-            This shell verifies backend reachability before wiring live notifications.
+            Service availability and transport layer are stable. Next phase can plug realtime feed.
           </Typography>
           <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
             <Chip
@@ -19,6 +19,7 @@ export const NotificationHome = () => {
               color={isLoading ? 'default' : health ? 'success' : 'warning'}
             />
             {health ? <Chip label={`uptime ${health.uptimeSeconds}s`} variant="outlined" /> : null}
+            {health ? <Chip label={`db ${health.dependencies.db}`} variant="outlined" /> : null}
           </Stack>
         </Stack>
       </CardContent>

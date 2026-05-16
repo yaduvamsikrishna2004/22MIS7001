@@ -1,7 +1,7 @@
 import type { PropsWithChildren } from 'react';
 import { createContext, useMemo } from 'react';
 
-import { httpClient } from '@shared/api/http-client';
+import { runtimeConfig } from '@shared/config/runtime-config';
 
 interface ApiContextValue {
   apiBaseUrl: string;
@@ -14,7 +14,7 @@ export const ApiContext = createContext<ApiContextValue>({
 export const ApiProvider = ({ children }: PropsWithChildren) => {
   const value = useMemo(
     () => ({
-      apiBaseUrl: httpClient.defaults.baseURL || ''
+      apiBaseUrl: runtimeConfig.apiBaseUrl
     }),
     []
   );

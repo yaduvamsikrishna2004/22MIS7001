@@ -1,34 +1,29 @@
 import { useEffect, useState } from 'react';
 
-import { httpClient } from '../api/http-client';
-import { logFrontend } from '../utils/frontend-log';
-
-interface ServiceHealth {
-  status: string;
-  service: string;
-  uptimeSeconds: number;
-  timestamp: string;
-}
+import { fetchServiceHealth, type ServiceHealth } from '../api/health-api';
+import { logFrontend } from '../telemetry/frontend-log';
 
 export const useBackendHealth = () => {
   const [health, setHealth] = useState<ServiceHealth | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const fetchHealth = async () => {
+    const loadHealth = async () => {
       try {
-        const response = await httpClient.get<{ data: ServiceHealth }>('/v1/health/status');
-        setHealth(response.data.data);
-        await logFrontend('info', 'hook', 'health snapshot received in UI');
+        const healthSnapshot = await fetchServiceHealth();
+        setHealth(healthSnapshot);
+        await logFrontend('info', 'hook', 'health snapshot loaded for shell', {
+          service: healthSnapshot.service
+        });
       } catch {
-        await logFrontend('error', 'hook', 'failed to fetch health snapshot');
+        await logFrontend('error', 'hook', 'health snapshot fetch failed');
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchHealth().catch(() => {
-      void logFrontend('error', 'hook', 'health hook execution failed');
+    loadHealth().catch(async () => {
+      await logFrontend('fatal', 'hook', 'health hook crashed unexpectedly');
     });
   }, []);
 
