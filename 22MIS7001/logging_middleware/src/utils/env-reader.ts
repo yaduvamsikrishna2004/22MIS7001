@@ -11,8 +11,16 @@ const toSafeInteger = (value: string | undefined, fallback: number): number => {
   return parsed;
 };
 
+const readNodeEnv = (key: string): string | undefined => {
+  if (typeof process === 'undefined' || !process.env) {
+    return undefined;
+  }
+
+  return process.env[key];
+};
+
 export const readEnv = (key: string): string | undefined => {
-  const value = process.env[key]?.trim();
+  const value = readNodeEnv(key)?.trim();
   return value && value.length > 0 ? value : undefined;
 };
 

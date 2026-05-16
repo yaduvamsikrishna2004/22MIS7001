@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import type { NotificationType } from '@shared/contracts/notification-contracts';
+import { logFrontend } from '@shared/telemetry/frontend-log';
 
 interface NotificationQueryState {
   page: number;
@@ -16,6 +17,13 @@ const parseNotificationType = (value: string | null): NotificationType | undefin
   if (value === 'Event' || value === 'Result' || value === 'Placement') {
     return value;
   }
+
+  if (value) {
+    void logFrontend('warn', 'state', 'invalid notification type query parameter', {
+      rawValue: value
+    });
+  }
+
   return undefined;
 };
 
@@ -26,6 +34,10 @@ const parsePositiveInt = (value: string | null, fallback: number): number => {
 
   const parsed = Number(value);
   if (!Number.isInteger(parsed) || parsed <= 0) {
+    void logFrontend('warn', 'state', 'invalid pagination query parameter', {
+      rawValue: value,
+      fallback
+    });
     return fallback;
   }
 
