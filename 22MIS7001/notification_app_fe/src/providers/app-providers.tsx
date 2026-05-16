@@ -1,6 +1,7 @@
 import type { PropsWithChildren } from 'react';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 
+import { ViewedNotificationsProvider } from '@features/notifications/state/viewed-notifications-context';
 import { ApiProvider } from './ApiProvider';
 
 const theme = createTheme({
@@ -23,7 +24,9 @@ const theme = createTheme({
 export const AppProviders = ({ children }: PropsWithChildren) => {
   return (
     <ThemeProvider theme={theme}>
-      <ApiProvider>{children}</ApiProvider>
+      <ApiProvider>
+        <ViewedNotificationsProvider>{children}</ViewedNotificationsProvider>
+      </ApiProvider>
     </ThemeProvider>
   );
 };
