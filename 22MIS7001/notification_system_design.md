@@ -962,3 +962,169 @@ Expected complexity discussion:
 - Join then uses indexed `notification_id` path into delivery rows.
 - Distinct on `student_id` still costs, but with a 7-day window it remains bounded; for heavier analytics, pre-aggregate into daily rollup tables.
 
+
+---
+
+## Stage 4: Performance Stabilization Strategy for High-Volume Notification Delivery
+
+### 4.1 Root Cause Analysis
+The current load profile is read-heavy with repeated requests for similar data windows. Feed APIs are hit on each page open, unread counters are recomputed frequently, and reconnecting clients often trigger duplicate sync calls. At scale, the dominant cost is no longer write fanout alone; it is repeated retrieval of near-identical feed slices.
+
+Primary bottlenecks:
+- repeated unread-count and feed-page reads for active users
+- polling overlap with websocket updates
+- cursor windows recomputed from primary storage too often
+- reconnect storms causing concurrent replay/delta traffic
+- high DB read amplification from mobile/web multi-session behavior
+
+### 4.2 Redis Caching Strategy
+Use Redis as a read-path accelerator, not as source of truth.
+
+Cache scopes:
+- feed-page window cache by `(studentId, category, cursor, limit)`
+- unread counter cache by `(studentId)`
+- short-lived reconnect coordination keys by `(studentId)`
+
+Policy:
+- feed TTL: short (20-45s) to absorb burst reads
+- unread TTL: shorter (10-20s) due to frequent state change
+- explicit invalidation on read-state mutation and fanout events where practical
+- lazy expiration fallback for missed invalidation paths
+
+### 4.3 Notification Feed Caching
+For `GET /v1/notifications`, cache only deterministic query windows.
+
+Design notes:
+- cursor-parameterized cache keys prevent cross-window pollution
+- cache hydrate on miss; serve stale window only if business allows soft staleness
+- maintain ranking order in cached response to avoid repeat sort work
+- log cache miss/hydration/slow resolver events via distributed logger
+
+Expected impact:
+- lower median latency for repeated feed views
+- reduced sort/load pressure on database for hot cohorts
+
+### 4.4 Unread Counter Caching
+`GET /v1/notifications/unread-count` should be cache-first.
+
+Approach:
+- maintain per-student unread counter in Redis
+- increment/decrement through event-driven updates where possible
+- fallback to DB recompute on cache miss or suspected drift
+- periodic reconciliation job (cron) to cap drift risk
+
+Tradeoff:
+- eventual consistency window exists, but bounded and operationally visible
+
+### 4.5 Delta Synchronization Approach
+Use delta sync to replace full-feed refresh after reconnect.
+
+Contract flow:
+1. client stores last acknowledged cursor
+2. reconnect calls `GET /v1/realtime/sync?sinceCursor=...&limit=...`
+3. server returns only newer items, plus next cursor
+4. client merges incrementally and avoids full refetch
+
+Benefits:
+- lower payload size
+- lower DB/cache reads for reconnect path
+- faster perceived recovery after network loss
+
+### 4.6 Cursor Pagination Strategy
+Move all feed navigation to cursor-based windows.
+
+Why:
+- offset pagination has linear skip cost on deep pages
+- cursor pagination aligns with index order and append-only delivery timeline
+
+Cursor payload:
+- delivery timestamp
+- notification id (tie-breaker)
+
+Operational behavior:
+- invalid cursor should degrade gracefully to first page with warning logs
+- keep cursor opaque (base64url encoded payload)
+
+### 4.7 Lazy Loading Strategy
+Avoid full notification history fetch on first render.
+
+Frontend behavior:
+- load unread count + first feed window only
+- fetch subsequent windows on scroll or explicit user action
+- pause polling if websocket channel is healthy
+
+Result:
+- lower startup payload and reduced cold-path latency
+
+### 4.8 WebSocket Push Optimization
+Use websocket primarily for near-real-time invalidation and new-item push.
+
+Optimizations:
+- push compact event payloads (id, category, priority, timestamp)
+- client fetches enriched details only when needed
+- coalesce burst updates into small batches for high-activity windows
+- publish unread badge updates as lightweight events
+
+### 4.9 Reconnect Storm Mitigation
+Reconnect storms can overload cache and DB with synchronized delta requests.
+
+Mitigation controls:
+- per-student reconnect attempt window with bounded threshold
+- retry-after signals when threshold exceeded
+- jittered reconnect delay at client
+- session registry to cap duplicate active sessions per student
+
+### 4.10 Read Replica Strategy
+Use read replicas for feed and unread read paths, with primary fallback.
+
+Guidelines:
+- default read path to replica for feed/list/count
+- fallback to primary when replica fails or lag breaches threshold
+- log fallback events for visibility and capacity planning
+
+Risk:
+- replica lag can briefly serve stale read-state; delta sync and short cache TTL reduce user impact
+
+### 4.11 Async Processing Opportunities
+Key async candidates:
+- notification fanout materialization
+- cache hydration for high-priority campaigns
+- unread reconciliation jobs
+- archival and cold-storage movement
+
+Queue-first execution protects interactive API latency during burst traffic.
+
+### 4.12 Tradeoff Analysis
+- **Latency vs consistency**: aggressive caching reduces latency but introduces bounded staleness.
+- **Memory vs DB load**: larger cache footprint reduces query load but increases Redis memory cost.
+- **Freshness vs reconnect safety**: strict reconnect throttles protect backend but can delay client catch-up.
+- **Replica offload vs correctness window**: replicas lower primary pressure with lag tradeoff.
+
+### 4.13 Operational Complexity Analysis
+Complexity introduced by Stage 4:
+- key design and invalidation discipline in cache layer
+- monitoring required for hit ratio, stale-read rate, replica lag, reconnect drops
+- coordinated rollout between API, websocket gateway, and frontend sync behavior
+
+Minimum observability requirements:
+- cache hit/miss by endpoint
+- p95 feed latency
+- reconnect rejection rate
+- replica fallback count
+- delta sync item volume
+
+### 4.14 Final Recommended Hybrid Architecture
+Recommended steady-state model:
+- PostgreSQL primary + read replicas for canonical storage
+- Redis for feed-window and unread-counter caching
+- WebSocket gateway for push invalidation/new-item signals
+- queue-backed async fanout and reconciliation workers
+- cursor-based APIs and delta sync for reconnect recovery
+
+Execution priority:
+1. unread + feed cache rollout
+2. cursor + delta sync enforcement
+3. reconnect coordination controls
+4. replica routing + fallback instrumentation
+
+This hybrid path minimizes DB read amplification while keeping consistency behavior explicit and operationally manageable.
