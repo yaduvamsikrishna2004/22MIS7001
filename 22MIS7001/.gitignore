@@ -1,0 +1,17 @@
+# shared
+node_modules/
+dist/
+build/
+coverage/
+
+# local env
+.env
+.env.*
+!.env.example
+
+# runtime
+*.log
+
+# system
+.DS_Store
+Thumbs.db
