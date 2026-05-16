@@ -7,6 +7,7 @@ const currentDir = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
   plugins: [react()],
+  envDir: path.resolve(currentDir, '..'),
   resolve: {
     alias: {
       '@app': path.resolve(currentDir, './src/app'),
