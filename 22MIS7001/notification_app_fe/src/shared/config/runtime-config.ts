@@ -7,7 +7,7 @@ export interface FrontendRuntimeConfig {
 }
 
 export interface RuntimeConfigurationWarning {
-  key: 'missingBearerToken' | 'missingApiBaseUrl';
+  key: 'missingBearerToken' | 'missingApiBaseUrl' | 'invalidApiBaseUrl';
   message: string;
 }
 
@@ -24,20 +24,53 @@ const parseTimeout = (value: string | undefined): number => {
   return parsed;
 };
 
+const DEFAULT_API_BASE_URL = 'http://localhost:8080';
+
+const normalizeApiBaseUrl = (
+  rawValue: string | undefined
+): { apiBaseUrl: string; warning?: RuntimeConfigurationWarning } => {
+  const candidate = rawValue?.trim();
+  if (!candidate) {
+    return {
+      apiBaseUrl: DEFAULT_API_BASE_URL,
+      warning: {
+        key: 'missingApiBaseUrl',
+        message: `API base URL not configured. Falling back to ${DEFAULT_API_BASE_URL}.`
+      }
+    };
+  }
+
+  try {
+    new URL(candidate);
+    return { apiBaseUrl: candidate };
+  } catch {
+    return {
+      apiBaseUrl: DEFAULT_API_BASE_URL,
+      warning: {
+        key: 'invalidApiBaseUrl',
+        message: `API base URL is invalid. Falling back to ${DEFAULT_API_BASE_URL}.`
+      }
+    };
+  }
+};
+
+const parsedApiBaseUrl = normalizeApiBaseUrl(
+  import.meta.env.VITE_NOTIFICATION_API_URL || import.meta.env.VITE_API_BASE_URL
+);
+
+const bearerToken = (import.meta.env.VITE_API_BEARER_TOKEN || '').trim();
+
 export const runtimeConfig: FrontendRuntimeConfig = {
-  apiBaseUrl:
-    import.meta.env.VITE_NOTIFICATION_API_URL ||
-    import.meta.env.VITE_API_BASE_URL ||
-    'http://localhost:8080',
+  apiBaseUrl: parsedApiBaseUrl.apiBaseUrl,
   appName: import.meta.env.VITE_APP_NAME || 'Campus Notification Platform',
   requestTimeoutMs: parseTimeout(import.meta.env.VITE_API_TIMEOUT_MS),
-  bearerToken: import.meta.env.VITE_API_BEARER_TOKEN || '',
+  bearerToken,
   defaultStudentId: import.meta.env.VITE_STUDENT_ID || 'student-demo'
 };
 
 export const runtimeWarnings: RuntimeConfigurationWarning[] = [
-  ...(runtimeConfig.apiBaseUrl ? [] : [{ key: 'missingApiBaseUrl' as const, message: 'API base URL is not configured.' }]),
-  ...(runtimeConfig.bearerToken
+  ...(parsedApiBaseUrl.warning ? [parsedApiBaseUrl.warning] : []),
+  ...(bearerToken
     ? []
     : [
         {

@@ -13,8 +13,12 @@ export interface ServiceHealth {
 }
 
 export const fetchServiceHealth = async (): Promise<ServiceHealth> => {
-  return executeRequest<ServiceHealth>('api', {
-    method: 'get',
-    url: '/v1/health/status'
-  });
+  return executeRequest<ServiceHealth>(
+    'api',
+    {
+      method: 'get',
+      url: '/v1/health/status'
+    },
+    { allowMissingAuthToken: true }
+  );
 };

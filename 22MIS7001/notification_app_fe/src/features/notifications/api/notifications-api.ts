@@ -1,7 +1,6 @@
 import { isAxiosError } from 'axios';
 
 import { executeRequest } from '@shared/api/request-client';
-import { runtimeConfig } from '@shared/config/runtime-config';
 import type { NotificationPageResult, NotificationRecord, NotificationType } from '@shared/contracts/notification-contracts';
 import { logFrontend } from '@shared/telemetry/frontend-log';
 
@@ -118,11 +117,6 @@ export const fetchNotificationsPage = async ({
   limit,
   notificationType
 }: FetchNotificationsInput): Promise<NotificationPageResult> => {
-  if (!runtimeConfig.bearerToken) {
-    await logFrontend('error', 'api', 'missing bearer token while requesting notifications');
-    throw new Error('Missing API bearer token');
-  }
-
   try {
     const rawData = await executeRequest<unknown>('api', {
       method: 'get',
@@ -132,10 +126,6 @@ export const fetchNotificationsPage = async ({
         page,
         limit,
         notification_type: notificationType
-      },
-      headers: {
-        Authorization: `Bearer ${runtimeConfig.bearerToken}`,
-        'X-Student-Id': runtimeConfig.defaultStudentId
       }
     });
 
